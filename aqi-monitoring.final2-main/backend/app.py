@@ -74,7 +74,9 @@ def predict():
         "co": get_sub_index(comp.get('co')/1000,"co"),
         "o3": get_sub_index(comp.get('o3'),"o3")
     }
-    owm_aqi = max(sub.values()) if sub else 0
+
+    dominant = max(sub, key=sub.get) if sub else "pm2_5"
+    owm_aqi = sub[dominant] if sub else 0
     final_aqi = owm_aqi
     min_dist = 999
 
@@ -87,6 +89,16 @@ def predict():
         w = 0.9 if min_dist < 5 else 0.6 if min_dist < 25 else 0.3
         final_aqi = (station_avg * w) + (owm_aqi * (1-w))
         final_aqi = max(min(final_aqi, station_avg+30), station_avg-30)
+
+    # --- DYNAMIC REASONS ---
+    reasons_map = {
+        "pm2_5": "Fine particles from vehicle exhaust, burning of fuels, or forest fires.",
+        "pm10": "Dust from construction, roads, and wind-blown sea salt or pollen.",
+        "no2": "High traffic density and combustion from power plants or cars.",
+        "so2": "Industrial emissions, coal burning, or oil refineries nearby.",
+        "co": "Incomplete combustion of fuels, often due to heavy traffic or wood burning.",
+        "o3": "Reaction of sunlight with pollutants from cars and industries (Smog)."
+    }
 
     diff = abs(final_aqi - owm_aqi)
     confidence = "High" if min_dist < 5 and diff < 20 else "Medium" if min_dist < 15 and diff < 50 else "Low"
@@ -101,10 +113,14 @@ def predict():
     cat, color = get_cat_data(round(final_aqi))
 
     return jsonify({
-        "aqi": round(final_aqi), "category": cat, "color": color,
-        "dominant_pollutant": max(sub, key=sub.get).upper().replace("_","."),
-        "pollution_reason": "Based on local concentration",
-        "components": comp, "confidence": confidence, "source": "Hybrid Engine"
+        "aqi": round(final_aqi), 
+        "category": cat, 
+        "color": color,
+        "dominant_pollutant": dominant.upper().replace("_","."),
+        "pollution_reason": reasons_map.get(dominant, "General urban pollution sources."),
+        "components": comp, 
+        "confidence": confidence, 
+        "source": "Hybrid Engine"
     })
 
 @app.route('/forecast', methods=['POST'])
@@ -114,7 +130,6 @@ def forecast():
         lat, lon = data.get('lat'), data.get('lon')
         state_name = data.get('state', 'Delhi')
         
-        # Initial pollutants from live data
         curr_pm25 = data.get('pm25', 60)
         curr_pm10 = data.get('pm10', 100)
         curr_no2 = data.get('no2', 40)
@@ -137,12 +152,10 @@ def forecast():
         
         for i in range(1, 8):
             future_date = base_date + timedelta(days=i)
-            
             idx = min(i * 8, len(forecast_list) - 1)
             w_data = forecast_list[idx] if forecast_list else {}
             temp = w_data.get('main', {}).get('temp', 25)
 
-            # --- THE FIX: Pass updated values to the model ---
             input_features = [
                 state_encoded, curr_pm25, curr_pm10, curr_no2, 
                 curr_nh3, curr_so2, curr_co, curr_o3,
@@ -150,9 +163,6 @@ def forecast():
             ]
             
             predicted_aqi = model.predict([input_features])[0]
-            
-            # Thoda fluctuation add karne ke liye (Hackathon trick)
-            # Taki chart thoda real lage up-down hota hua
             variation = random.uniform(-5, 5) 
             display_aqi = round(predicted_aqi + variation)
 
@@ -164,9 +174,7 @@ def forecast():
                 "condition": w_data.get('weather', [{}])[0].get('main', 'Clear')
             })
 
-            # NEXT DAY KE LIYE DATA UPDATE KARO
-            # Hum pollutants ko thoda change karte hain predicted AQI ke hisaab se
-            curr_pm25 = predicted_aqi * 0.6  # Rough estimation
+            curr_pm25 = predicted_aqi * 0.6
             curr_pm10 = predicted_aqi * 0.9
 
         return jsonify({"forecast": preds})
