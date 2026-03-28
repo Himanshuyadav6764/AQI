@@ -13,7 +13,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # CORS setup for Frontend communication
-CORS(app, resources={r"/*": {"origins": "*"}}) 
+CORS(app, resources={r"/*": {"origins": ["https://aqi-monitoring-final2.vercel.app/","http://localhost:5173"]}}) 
 
 WAQI_TOKEN = os.getenv("WAQI_TOKEN")
 OWM_KEY = os.getenv("OPENWEATHER_API_KEY")
