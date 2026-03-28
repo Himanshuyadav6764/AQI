@@ -2,12 +2,15 @@ import os
 import requests
 from datetime import datetime, timedelta
 import math
-import joblib
 import random
-import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS  
 from dotenv import load_dotenv
+
+try:
+    import joblib
+except Exception:
+    joblib = None
 
 load_dotenv()
 app = Flask(__name__)
@@ -22,12 +25,17 @@ WAQI_TOKEN = os.getenv("WAQI_TOKEN")
 OWM_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 # --- LOAD MODELS ---
-try:
-    model = joblib.load(os.path.join(BASE_DIR, 'aqi_7day_model.pkl'))
-    le = joblib.load(os.path.join(BASE_DIR, 'city_encoder.pkl'))
-    print("✅ MODEL & ENCODER LOADED SUCCESSFULLY")
-except Exception as e:
-    print(f"❌ ERROR LOADING MODELS: {e}")
+model = None
+le = None
+if joblib is not None:
+    try:
+        model = joblib.load(os.path.join(BASE_DIR, 'aqi_7day_model.pkl'))
+        le = joblib.load(os.path.join(BASE_DIR, 'city_encoder.pkl'))
+        print("✅ MODEL & ENCODER LOADED SUCCESSFULLY")
+    except Exception as e:
+        print(f"❌ ERROR LOADING MODELS: {e}")
+else:
+    print("⚠️ joblib unavailable, forecast will use heuristic fallback")
 
 # --- UTILS ---
 BREAKPOINTS = {
@@ -148,10 +156,12 @@ def forecast():
         preds = []
         base_date = datetime.now()
         
-        try:
-            state_encoded = le.transform([state_name])[0]
-        except:
-            state_encoded = 0 
+        state_encoded = 0
+        if le is not None:
+            try:
+                state_encoded = le.transform([state_name])[0]
+            except Exception:
+                state_encoded = 0
         
         for i in range(1, 8):
             future_date = base_date + timedelta(days=i)
@@ -160,12 +170,18 @@ def forecast():
             temp = w_data.get('main', {}).get('temp', 25)
 
             input_features = [
-                state_encoded, curr_pm25, curr_pm10, curr_no2, 
+                state_encoded, curr_pm25, curr_pm10, curr_no2,
                 curr_nh3, curr_so2, curr_co, curr_o3,
                 future_date.day, future_date.month, future_date.weekday()
             ]
-            
-            predicted_aqi = model.predict([input_features])[0]
+
+            if model is not None:
+                predicted_aqi = model.predict([input_features])[0]
+            else:
+                # Heuristic fallback to keep forecasts available on lightweight runtimes.
+                weather_adjust = max(min((temp - 25) * 0.7, 8), -8)
+                predicted_aqi = (0.55 * curr_pm25) + (0.35 * curr_pm10) + 25 + weather_adjust
+
             variation = random.uniform(-5, 5) 
             display_aqi = round(predicted_aqi + variation)
 
