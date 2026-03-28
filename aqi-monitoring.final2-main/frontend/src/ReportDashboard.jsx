@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const apiUrl = (path) => `${API_BASE_URL}${path}`;
+
 const ReportDashboard = ({ data, onClose }) => {
   const [persona, setPersona] = useState('Adult');
   const [aiAdvice, setAiAdvice] = useState('');
@@ -16,7 +19,7 @@ const ReportDashboard = ({ data, onClose }) => {
   const fetchAiAdvice = async (selectedPersona) => {
     setLoadingAdvice(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/get-ai-advice", {
+      const res = await fetch(apiUrl('/api/get-ai-advice'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

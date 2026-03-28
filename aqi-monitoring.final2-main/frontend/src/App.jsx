@@ -6,6 +6,9 @@ import MapChart from './MapChart';
 import ReportDashboard from './ReportDashboard';
 import './App.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const apiUrl = (path) => `${API_BASE_URL}${path}`;
+
 function App() {
   const [selectedState, setSelectedState] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
@@ -20,7 +23,7 @@ function App() {
   setLoading(true);
   try {
 
-    const predictRes = await fetch("http://127.0.0.1:5000/predict", {
+    const predictRes = await fetch(apiUrl('/api/predict'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -33,7 +36,7 @@ function App() {
     if (currentData.error) throw new Error(currentData.error);
 
   
-    const forecastRes = await fetch("http://127.0.0.1:5000/forecast", {
+    const forecastRes = await fetch(apiUrl('/api/forecast'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 

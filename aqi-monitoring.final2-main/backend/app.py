@@ -12,16 +12,19 @@ from dotenv import load_dotenv
 load_dotenv()
 app = Flask(__name__)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # CORS setup for Frontend communication
-CORS(app, resources={r"/*": {"origins": ["https://aqi-monitoring-final2.vercel.app/","http://localhost:5173"]}}) 
+cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+CORS(app, resources={r"/*": {"origins": cors_origins or ["*"]}})
 
 WAQI_TOKEN = os.getenv("WAQI_TOKEN")
 OWM_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 # --- LOAD MODELS ---
 try:
-    model = joblib.load('aqi_7day_model.pkl')
-    le = joblib.load('city_encoder.pkl')
+    model = joblib.load(os.path.join(BASE_DIR, 'aqi_7day_model.pkl'))
+    le = joblib.load(os.path.join(BASE_DIR, 'city_encoder.pkl'))
     print("✅ MODEL & ENCODER LOADED SUCCESSFULLY")
 except Exception as e:
     print(f"❌ ERROR LOADING MODELS: {e}")
